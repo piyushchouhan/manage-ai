@@ -1,0 +1,12 @@
+[project]
+name = "manage-ai-backend"
+version = "0.1.0"
+description = "Warehouse AI assistant - learning project"
+requires-python = ">=3.12"
+dependencies = [
+    "sqlalchemy>=2.0",
+    "psycopg[binary]>=3.2",
+    "python-dotenv>=1.0",
+    "faker>=30.0",
+    "google-genai>=3.3.0",
+]
