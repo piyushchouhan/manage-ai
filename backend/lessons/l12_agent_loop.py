@@ -71,11 +71,13 @@ def run_agent(
     registry: dict = TOOL_REGISTRY,
     max_steps: int = MAX_STEPS,
     tracer=None,  # optional: something with model_call / tool_call / finish (lesson 1.4)
+    history: list[types.Content] | None = None,  # optional: earlier turns of a chat (used by the API)
 ) -> str:
     # The conversation we build up. Remember 0.2: the model is stateless,
     # so every call resends EVERYTHING, including earlier tool calls and results.
     contents: list[types.Content] = [
-        types.Content(role="user", parts=[types.Part.from_text(text=question)])
+        *(history or []),
+        types.Content(role="user", parts=[types.Part.from_text(text=question)]),
     ]
     print(f"\nQ: {question}")
 
