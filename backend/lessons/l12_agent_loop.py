@@ -19,6 +19,7 @@ Experiments:
 """
 
 import json
+import time
 
 from app.db import query
 from app.llm import MODEL, client, types
@@ -69,6 +70,7 @@ def run_agent(
     config: types.GenerateContentConfig = CONFIG,
     registry: dict = TOOL_REGISTRY,
     max_steps: int = MAX_STEPS,
+    tracer=None,  # optional: something with model_call / tool_call / finish (lesson 1.4)
 ) -> str:
     # The conversation we build up. Remember 0.2: the model is stateless,
     # so every call resends EVERYTHING, including earlier tool calls and results.
@@ -78,14 +80,20 @@ def run_agent(
     print(f"\nQ: {question}")
 
     for step in range(1, max_steps + 1):
+        t0 = time.perf_counter()
         response = client.models.generate_content(model=MODEL, contents=contents, config=config)
+        if tracer:
+            tracer.model_call(step, response, time.perf_counter() - t0)
         tokens = response.usage_metadata.prompt_token_count
         print(f"   [step {step}] model call #{step}  (prompt tokens: {tokens})")
 
         # 1. No function call -> the model is done. Its text is the answer.
         if not response.function_calls:
             print(f"   [step {step}] model -> FINAL ANSWER")
-            return response.text.strip()
+            answer = response.text.strip()
+            if tracer:
+                tracer.finish(answer=answer)
+            return answer
 
         # 2. Keep the model's turn (with its function_call) in the history.
         #    Without this, the next call wouldn't know what it asked for.
@@ -96,8 +104,11 @@ def run_agent(
         for call in response.function_calls:
             print(f"   [step {step}] model -> wants {call.name}({call.args})")
             fn = registry.get(call.name)
+            t0 = time.perf_counter()
             # pyrefly: ignore[bad-unpacking]
             result = fn(**call.args) if fn else {"error": f"no such tool {call.name!r}"}
+            if tracer:
+                tracer.tool_call(step, call.name, call.args, result, time.perf_counter() - t0)
             preview = json.dumps(result)
             print(f"   [step {step}] code  -> ran it, result: {preview[:200]}{'...' if len(preview) > 200 else ''}")
             result_parts.append(types.Part.from_function_response(name=call.name, response=result))
@@ -105,6 +116,8 @@ def run_agent(
         # 4. Feed the evidence back. Then loop: the model sees it on the next call.
         contents.append(types.Content(role="user", parts=result_parts))
 
+    if tracer:
+        tracer.finish(error=f"no final answer after {max_steps} steps")
     raise TooManySteps(f"no final answer after {max_steps} steps")
 
 

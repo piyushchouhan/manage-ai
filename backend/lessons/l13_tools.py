@@ -157,9 +157,9 @@ CONFIG = types.GenerateContentConfig(
 )
 
 
-def ask(question: str) -> str:
+def ask(question: str, tracer=None) -> str:
     """1.2's loop, with this lesson's tools and system prompt."""
-    return run_agent(question, config=CONFIG, registry=TOOL_REGISTRY, max_steps=MAX_STEPS)
+    return run_agent(question, config=CONFIG, registry=TOOL_REGISTRY, max_steps=MAX_STEPS, tracer=tracer)
 
 
 def main():
