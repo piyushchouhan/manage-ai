@@ -44,6 +44,7 @@ uv run python -m lessons.l11_function_call # 1.1 function calling (no execution)
 uv run python -m lessons.l12_agent_loop    # 1.2 the agent loop
 uv run python -m lessons.l13_tools         # 1.3 multiple tools and chaining
 uv run python -m lessons.l14_tracing       # 1.4 tracing (then: list / show <file>)
+uv run python -m lessons.l21_permissions   # 2.1 permission-scoped tools
 ```
 
 ## Data
