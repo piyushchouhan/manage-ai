@@ -14,6 +14,7 @@ import time
 
 # Shared client + model name (configured once in app/llm.py from the root .env)
 from app.llm import MODEL, client, types
+from lessons.common import header
 
 
 def ask(contents, system: str | None = None, temperature: float = 0.0):
@@ -35,9 +36,6 @@ def ask(contents, system: str | None = None, temperature: float = 0.0):
     print(f"   latency: {elapsed:.2f}s")
     return response
 
-
-def header(title: str):
-    print(f"\n{'=' * 70}\n{title}\n{'=' * 70}")
 
 
 # --- Experiment 1: the basic call --------------------------------------------

@@ -22,6 +22,7 @@ from typing import Literal
 from pydantic import BaseModel, Field, ValidationError, model_validator
 
 from app.llm import MODEL, client, types
+from lessons.common import header
 
 TODAY = date.today()
 
@@ -87,9 +88,6 @@ def parse(question: str) -> tuple[ParsedQuery, types.GenerateContentResponse]:
     # 3. Validate with Pydantic ourselves (runs our model_validator rules too)
     return ParsedQuery.model_validate_json(response.text), response
 
-
-def header(title: str):
-    print(f"\n{'=' * 78}\n{title}\n{'=' * 78}")
 
 
 # --- Experiment 1 -------------------------------------------------------------
