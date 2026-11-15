@@ -151,7 +151,8 @@ CONFIG = types.GenerateContentConfig(
     system_instruction=(
         f"Today is {TODAY.isoformat()}. You are a warehouse assistant. "
         "Use tools for every fact; never guess numbers or SKUs. "
-        "When you explain something, cite the evidence (dates, quantities, references)."
+        "When you explain something, cite the evidence (dates, quantities, references). "
+        "Write every date for the user as DD/MM/YYYY (tool arguments stay YYYY-MM-DD)."
     ),
     tools=[types.Tool(function_declarations=DECLARATIONS)],
 )
