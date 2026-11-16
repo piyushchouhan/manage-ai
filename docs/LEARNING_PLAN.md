@@ -179,7 +179,7 @@ raise TooManySteps()
 
 ---
 
-## Module 4: Conversation state
+## Module 4: Conversation state and context
 
 **Why:** "What about the second one?" only works if the system remembers what it showed you.
 
@@ -193,10 +193,35 @@ raise TooManySteps()
 - **Done when:** "show low stock items" → "movements for the 2nd one" works.
 - **Self-check:** Should selections live in the prompt, in the DB, or both?
 
-### 4.3 Managing long context
+### 4.3 Context compaction (long chats)
 - **Build:** once the history passes N tokens, summarize the older turns into a running summary while keeping the recent turns verbatim.
 - **Done when:** a 40-turn chat still works, and tokens per call stay bounded.
 - **Self-check:** What gets lost in summarization, and how do selections survive?
+
+### 4.4 Context assembly and token budget
+- **Build:** one `build_context()` that puts together the system prompt, user context, chat history and tool results in a fixed order, counts tokens per part (`count_tokens`), and trims any part that goes over its budget.
+- **Done when:** every call prints a per-part token breakdown, and an over-budget part (e.g. a huge tool result) gets trimmed instead of overflowing.
+- **Self-check:** Which part of the context grows fastest in a long investigation?
+
+### 4.5 Context selection
+- **Build:** send only what the question needs: only the relevant tools, only the history turns that matter, only the rows that answer the question.
+- **Done when:** the same test questions get the same answers with 30%+ fewer prompt tokens (measured from traces).
+- **Self-check:** What breaks if you select too little?
+
+### 4.6 Memory and retrieval (RAG basics)
+- **Build:** short-term memory (this session) vs long-term memory (facts about the user saved across sessions). Embed movement notes into `pgvector` and retrieve the top-k relevant ones for a question.
+- **Done when:** a preference stated in session 1 is used in session 2, and a question is answered from retrieved notes with the note cited.
+- **Self-check:** When is a tool call better than retrieval, and when is retrieval better?
+
+### 4.7 Context isolation
+- **Build:** keep context separate per user, per session and per sub-task. Nothing from one user's chat or tool results can reach another's.
+- **Done when:** a test runs two users' chats in parallel and proves neither sees the other's data.
+- **Self-check:** Where could context leak between users in our current code?
+
+### 4.8 Context evaluation
+- **Build:** tests that check the assembled context itself, not just the final answer: the needed facts are present, forbidden data is absent, and it fits the budget.
+- **Done when:** 10 test questions pass all three checks.
+- **Self-check:** Why can a correct answer still hide a context problem?
 
 ---
 

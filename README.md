@@ -25,12 +25,26 @@ createdb warehouse_ai
 cd backend
 uv sync
 uv run python -m scripts.seed     # 180 days of simulated warehouse data
+uv run python -m scripts.create_readonly_role   # SELECT-only DB role the AI tools use
+uv run python -m scripts.enable_fuzzy_search    # pg_trgm for typo-tolerant product search
 
 # frontend
 cd ../frontend
 npm install
 npm run dev                       # http://localhost:5173
 ```
+
+## Chat in the browser
+
+Two terminals:
+
+```bash
+cd backend  && uv run uvicorn app.main:app --reload --port 8000   # API: POST /api/chat
+cd frontend && npm run dev                                         # open http://localhost:5173
+```
+
+The API runs the latest lesson agent (1.2 loop + 3.3 tools). Every question is saved
+as a trace in `backend/traces/`; replay with `uv run python -m lessons.l14_tracing show`.
 
 ## Lessons
 
@@ -46,6 +60,10 @@ uv run python -m lessons.l13_tools         # 1.3 multiple tools and chaining
 uv run python -m lessons.l14_tracing       # 1.4 tracing (then: list / show <file>)
 uv run python -m lessons.l21_permissions   # 2.1 permission-scoped tools
 uv run python -m lessons.l22_tool_design   # 2.2 good tool design
+uv run python -m lessons.l23_injection     # 2.3 prompt injection + read-only DB role
+uv run python -m lessons.l31_fuzzy_search  # 3.1 fuzzy product search (pg_trgm)
+uv run python -m lessons.l32_dates         # 3.2 dates: model describes, code calculates
+uv run python -m lessons.l33_clarify       # 3.3 clarifying questions instead of guessing
 ```
 
 ## Data

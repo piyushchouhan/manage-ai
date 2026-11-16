@@ -7,7 +7,7 @@ Contract (what frontend/src/App.tsx sends and expects):
     POST /api/chat   {"messages": [{"role": "user"|"assistant", "content": "..."}, ...]}
                   -> {"reply": "..."}
 
-The agent is the latest one from the lessons: 1.2's loop + 3.1's tools.
+The agent is the latest one from the lessons: 1.2's loop + 3.3's tools (asks when a product name is ambiguous).
 When a later lesson improves the agent, change the imports below.
 
 Not yet (coming in later lessons): login/permissions (2.1 is ready, needs a
@@ -18,11 +18,9 @@ from fastapi import FastAPI
 from pydantic import BaseModel
 
 from app.llm import types
-from lessons.l12_agent_loop import TooManySteps, run_agent
+from lessons.l12_agent_loop import TooManySteps
 from lessons.l14_tracing import Tracer
-from lessons.l31_fuzzy_search import CONFIG_V3, TOOLS_V3
-
-MAX_STEPS = 8
+from lessons.l33_clarify import Clarification, ask
 
 app = FastAPI(title="Manage AI")
 
@@ -57,14 +55,13 @@ def chat(req: ChatRequest) -> ChatReply:
     # doesn't block other requests.
     *earlier, last = req.messages
     try:
-        reply = run_agent(
+        result = ask(
             last.content,
-            config=CONFIG_V3,
-            registry=TOOLS_V3,
-            max_steps=MAX_STEPS,
             tracer=Tracer(last.content),  # every browser question is saved to backend/traces/
             history=to_history(earlier),
         )
+        # A clarification becomes a numbered list for now; buttons come in lesson 9.2
+        reply = result.as_text() if isinstance(result, Clarification) else result
     except TooManySteps:
         reply = "Sorry, I couldn't finish that within the step limit. Try asking a narrower question."
     return ChatReply(reply=reply)
