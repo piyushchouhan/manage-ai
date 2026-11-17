@@ -8,6 +8,9 @@
                      └──< payments
 
     users ──< user_warehouse_access >── warehouses   (permission scoping for AI tools)
+
+    chat_sessions ──< chat_messages                  (saved chat history, lesson 4.1)
+                 ──  chat_state                     (last list shown + pending question, 4.2)
 """
 
 from datetime import date, datetime
@@ -18,11 +21,13 @@ from sqlalchemy import (
     Date,
     DateTime,
     ForeignKey,
+    JSON,
     Integer,
     Numeric,
     String,
     Text,
     UniqueConstraint,
+    func,
 )
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 
@@ -179,3 +184,29 @@ class UserWarehouseAccess(Base):
     id: Mapped[int] = mapped_column(primary_key=True)
     user_id: Mapped[int] = mapped_column(ForeignKey("users.id"))
     warehouse_id: Mapped[int] = mapped_column(ForeignKey("warehouses.id"))
+
+
+# ---------- Chat history (lesson 4.1) ----------
+
+class ChatSession(Base):
+    __tablename__ = "chat_sessions"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
+
+
+class ChatMessage(Base):
+    __tablename__ = "chat_messages"
+    __table_args__ = (CheckConstraint("role IN ('user','assistant')"),)
+    id: Mapped[int] = mapped_column(primary_key=True)
+    session_id: Mapped[int] = mapped_column(ForeignKey("chat_sessions.id"), index=True)
+    role: Mapped[str] = mapped_column(String(20))
+    content: Mapped[str] = mapped_column(Text)
+    created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
+
+
+class ChatState(Base):
+    """What the user is looking at (lesson 4.2): the last numbered list, and any open question."""
+    __tablename__ = "chat_state"
+    session_id: Mapped[int] = mapped_column(ForeignKey("chat_sessions.id"), primary_key=True)
+    selection: Mapped[list] = mapped_column(JSON, default=list)  # [{"sku", "name"}, ...] in shown order
+    pending: Mapped[dict | None] = mapped_column(JSON)  # {"question", "asked", "options"} or None

@@ -4,67 +4,55 @@ Run from backend/:   uv run uvicorn app.main:app --reload --port 8000
 Then the frontend:   cd frontend && npm run dev   ->  http://localhost:5173
 
 Contract (what frontend/src/App.tsx sends and expects):
-    POST /api/chat   {"messages": [{"role": "user"|"assistant", "content": "..."}, ...]}
-                  -> {"reply": "..."}
+    POST /api/chat                    {"session_id": int | null, "message": "..."}
+                                   -> {"session_id": int, "reply": "..."}
+    GET  /api/sessions/{id}/messages -> [{"role": "user"|"assistant", "content": "..."}, ...]
 
+History lives in the DB (lesson 4.1), not in the browser: the browser only keeps the session id.
+The last list shown and any pending question are saved too (4.2), so "the 2nd one" works.
 The agent is the latest one from the lessons: 1.2's loop + 3.3's tools (asks when a product name is ambiguous).
 When a later lesson improves the agent, change the imports below.
 
 Not yet (coming in later lessons): login/permissions (2.1 is ready, needs a
-user from the session), saved chat history (4.1), streaming (8.3).
+user from the session), streaming (8.3).
 """
 
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
 
-from app.llm import types
-from lessons.l12_agent_loop import TooManySteps
 from lessons.l14_tracing import Tracer
-from lessons.l33_clarify import Clarification, ask
+from lessons.l41_history import load_messages, new_session, session_exists
+from lessons.l42_selections import chat as chat_turn  # 4.1's saved history + 4.2's selections
+from lessons.l42_selections import ensure_tables
 
+ensure_tables()
 app = FastAPI(title="Manage AI")
 
 
-class ChatMessage(BaseModel):
-    role: str  # "user" | "assistant"
-    content: str
-
-
 class ChatRequest(BaseModel):
-    messages: list[ChatMessage]
+    session_id: int | None = None  # None = start a new conversation
+    message: str
 
 
 class ChatReply(BaseModel):
+    session_id: int
     reply: str
-
-
-def to_history(messages: list[ChatMessage]) -> list[types.Content]:
-    # The browser calls the AI "assistant"; Gemini calls it "model".
-    return [
-        types.Content(
-            role="model" if m.role == "assistant" else "user",
-            parts=[types.Part.from_text(text=m.content)],
-        )
-        for m in messages
-    ]
 
 
 @app.post("/api/chat", response_model=ChatReply)
 def chat(req: ChatRequest) -> ChatReply:
     # Plain `def` (not async): FastAPI runs it in a thread, so a slow model call
     # doesn't block other requests.
-    *earlier, last = req.messages
-    try:
-        result = ask(
-            last.content,
-            tracer=Tracer(last.content),  # every browser question is saved to backend/traces/
-            history=to_history(earlier),
-        )
-        # A clarification becomes a numbered list for now; buttons come in lesson 9.2
-        reply = result.as_text() if isinstance(result, Clarification) else result
-    except TooManySteps:
-        reply = "Sorry, I couldn't finish that within the step limit. Try asking a narrower question."
-    return ChatReply(reply=reply)
+    sid = req.session_id if req.session_id and session_exists(req.session_id) else new_session()
+    reply = chat_turn(sid, req.message, tracer=Tracer(req.message))  # trace saved to backend/traces/
+    return ChatReply(session_id=sid, reply=reply)
+
+
+@app.get("/api/sessions/{session_id}/messages")
+def messages(session_id: int) -> list[dict]:
+    if not session_exists(session_id):
+        raise HTTPException(404, "no such session")
+    return load_messages(session_id)
 
 
 @app.get("/api/health")
