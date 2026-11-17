@@ -11,6 +11,7 @@
 
     chat_sessions ──< chat_messages                  (saved chat history, lesson 4.1)
                  ──  chat_state                     (last list shown + pending question, 4.2)
+                 ──  chat_summaries                 (running summary of old turns, 4.3)
 """
 
 from datetime import date, datetime
@@ -210,3 +211,11 @@ class ChatState(Base):
     session_id: Mapped[int] = mapped_column(ForeignKey("chat_sessions.id"), primary_key=True)
     selection: Mapped[list] = mapped_column(JSON, default=list)  # [{"sku", "name"}, ...] in shown order
     pending: Mapped[dict | None] = mapped_column(JSON)  # {"question", "asked", "options"} or None
+
+
+class ChatSummary(Base):
+    """Running summary of a long chat (lesson 4.3). Messages with id <= upto_id are folded into it."""
+    __tablename__ = "chat_summaries"
+    session_id: Mapped[int] = mapped_column(ForeignKey("chat_sessions.id"), primary_key=True)
+    summary: Mapped[str] = mapped_column(Text, default="")
+    upto_id: Mapped[int] = mapped_column(Integer, default=0)
