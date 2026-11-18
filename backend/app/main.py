@@ -11,6 +11,7 @@ Contract (what frontend/src/App.tsx sends and expects):
 History lives in the DB (lesson 4.1), not in the browser: the browser only keeps the session id.
 The last list shown and any pending question are saved too (4.2), so "the 2nd one" works.
 Long chats are compacted (4.3): old turns become a running summary, recent ones are sent word for word.
+Every model call is on a token budget per part (4.4); the breakdown prints in the uvicorn log.
 The agent is the latest one from the lessons: 1.2's loop + 3.3's tools (asks when a product name is ambiguous).
 When a later lesson improves the agent, change the imports below.
 
@@ -23,8 +24,8 @@ from pydantic import BaseModel
 
 from lessons.l14_tracing import Tracer
 from lessons.l41_history import load_messages, new_session, session_exists
-from lessons.l43_compaction import chat as chat_turn  # 4.1 history + 4.2 selections + 4.3 compaction
 from lessons.l43_compaction import ensure_tables
+from lessons.l44_budget import chat as chat_turn  # 4.1 history + 4.2 selections + 4.3 compaction + 4.4 budgets
 
 ensure_tables()
 app = FastAPI(title="Manage AI")

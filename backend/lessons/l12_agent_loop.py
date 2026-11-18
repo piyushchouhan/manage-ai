@@ -72,6 +72,7 @@ def run_agent(
     max_steps: int = MAX_STEPS,
     tracer=None,  # optional: something with model_call / tool_call / finish (lesson 1.4)
     history: list[types.Content] | None = None,  # optional: earlier turns of a chat (used by the API)
+    prepare=None,  # optional: prepare(contents, config) -> contents, run before every model call (4.4 budgets)
 ) -> str:
     # The conversation we build up. Remember 0.2: the model is stateless,
     # so every call resends EVERYTHING, including earlier tool calls and results.
@@ -82,6 +83,8 @@ def run_agent(
     print(f"\nQ: {question}")
 
     for step in range(1, max_steps + 1):
+        if prepare:
+            contents = prepare(contents, config)
         t0 = time.perf_counter()
         response = client.models.generate_content(model=MODEL, contents=contents, config=config)
         if tracer:

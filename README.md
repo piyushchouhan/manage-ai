@@ -43,7 +43,8 @@ cd backend  && uv run uvicorn app.main:app --reload --port 8000   # API: POST /a
 cd frontend && npm run dev                                         # open http://localhost:5173
 ```
 
-The API runs the latest lesson agent (1.2 loop + 3.3 tools). Every question is saved
+The API runs the latest lesson agent (1.2 loop + 3.3 tools). Chats are saved in
+`chat_sessions` / `chat_messages` (4.1), so a page refresh keeps the conversation. Every question is saved
 as a trace in `backend/traces/`; replay with `uv run python -m lessons.l14_tracing show`.
 
 ## Lessons
@@ -64,6 +65,10 @@ uv run python -m lessons.l23_injection     # 2.3 prompt injection + read-only DB
 uv run python -m lessons.l31_fuzzy_search  # 3.1 fuzzy product search (pg_trgm)
 uv run python -m lessons.l32_dates         # 3.2 dates: model describes, code calculates
 uv run python -m lessons.l33_clarify       # 3.3 clarifying questions instead of guessing
+uv run python -m lessons.l41_history       # 4.1 chat history saved in the DB
+uv run python -m lessons.l42_selections    # 4.2 'the 2nd one', 'all of them', pending choices
+uv run python -m lessons.l43_compaction    # 4.3 running summary keeps long chats bounded
+uv run python -m lessons.l44_budget        # 4.4 per-part token breakdown + trimming
 ```
 
 ## Data

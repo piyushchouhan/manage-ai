@@ -112,11 +112,12 @@ DECLS_V5 = {**DECLS_V3, "resolve_period": RESOLVE_DECL, "search_products": SEARC
 CONFIG_V5 = CONFIG_V4.model_copy(update={"tools": [types.Tool(function_declarations=list(DECLS_V5.values()))]})
 
 
-def ask(question: str, tracer=None, history=None, config=CONFIG_V5, registry=TOOLS_V5) -> str | Clarification:
+def ask(question: str, tracer=None, history=None, config=CONFIG_V5, registry=TOOLS_V5,
+        prepare=None) -> str | Clarification:
     """A text answer, or a Clarification when the agent needs the user to choose."""
     try:
         return run_agent(question, config=config, registry=registry, max_steps=MAX_STEPS,
-                         tracer=tracer, history=history)
+                         tracer=tracer, history=history, prepare=prepare)
     except NeedsClarification as e:
         if tracer:
             tracer.finish(answer=e.clarification.as_text())

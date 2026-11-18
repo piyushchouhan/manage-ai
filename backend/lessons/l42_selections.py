@@ -117,9 +117,10 @@ def state_prompt(state: dict) -> str:
 # --- One chat turn: 4.1's turn + state ------------------------------------------------
 
 def chat(session_id: int, text: str, tracer=None, log: list | None = None,
-         history: list[types.Content] | None = None, extra_prompt: str = "") -> str:
+         history: list[types.Content] | None = None, extra_prompt: str = "", prepare=None) -> str:
     """log: pass a list to see every tool call afterwards (the experiments check SKUs with it).
-    history / extra_prompt: 4.3 passes a compacted history and the running summary; default = full history."""
+    history / extra_prompt: 4.3 passes a compacted history and the running summary; default = full history.
+    prepare: 4.4's budget check, run before every model call."""
     state = load_state(session_id)
     config = CONFIG_V6.model_copy(update={
         "system_instruction": CONFIG_V6.system_instruction + extra_prompt + state_prompt(state)
@@ -128,7 +129,7 @@ def chat(session_id: int, text: str, tracer=None, log: list | None = None,
     if history is None:
         history = to_history(load_messages(session_id))
     result = run_turn(text, tracer=tracer, history=history,
-                      config=config, registry=recording(TOOLS_V6, log))
+                      config=config, registry=recording(TOOLS_V6, log), prepare=prepare)
 
     if isinstance(result, Clarification):  # the agent is waiting on the user
         state = {"selection": result.options,
