@@ -69,13 +69,15 @@ def route(question: str, tracer=None) -> Route:
     return Route.model_validate_json(r.text)
 
 
-def chat(session_id: int, text: str, tracer=None, log: list | None = None, **extra) -> str:
+def chat(session_id: int, text: str, tracer=None, log: list | None = None,
+         selected: Route | None = None, **extra) -> str:
     """4.4's turn, with only the tools and history this question needs.
+    selected: a route already decided (5.2's router fills these fields too), so we don't route twice.
     **extra (extra_prompt, extra_tools from 4.6) is passed straight through."""
     if load_state(session_id)["pending"]:  # the user is answering our question: send everything
         print("   [route] pending choice -> all tools + history")
         return chat_with_budget(session_id, text, tracer=tracer, log=log, **extra)
-    r = route(text, tracer)
+    r = selected or route(text, tracer)
     tools = ALWAYS + [t for g in r.groups for t in GROUPS[g]]
     print(f"   [route] groups={r.groups} follow_up={r.follow_up} -> tools {tools}")
     return chat_with_budget(session_id, text, tracer=tracer, log=log, tools=tools, use_history=r.follow_up,

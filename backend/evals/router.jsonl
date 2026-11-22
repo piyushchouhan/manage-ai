@@ -1,0 +1,36 @@
+{"message": "How many padlocks are in Bangalore?", "route": "simple_read"}
+{"message": "Show me invoice INV-00558", "route": "simple_read"}
+{"message": "What is running low in Delhi?", "route": "simple_read"}
+{"message": "Is INV-00903 paid?", "route": "simple_read"}
+{"message": "List padlock movements in BLR last month", "route": "simple_read"}
+{"message": "stock of box", "route": "simple_read"}
+{"message": "padlok stock blr", "route": "simple_read"}
+{"message": "BLR mein padlock kitne hai?", "route": "simple_read"}
+{"message": "Delhi ka low stock dikhao", "route": "simple_read"}
+{"message": "and in Mumbai?", "route": "simple_read", "earlier": [{"role": "user", "content": "How many padlocks are in Bangalore?"}, {"role": "assistant", "content": "There are 222 pcs of Padlock 50mm Brass (HAR-0018) in Bengaluru (BLR)."}]}
+{"message": "movements for the 2nd one", "route": "simple_read", "earlier": [{"role": "user", "content": "What is running low in BLR?"}, {"role": "assistant", "content": "1. OFF-0027 Ball Pen Blue 50pc (BLR): 11 left, reorder at 20\n2. FOO-0040 Sugar 50kg (BLR): 28 left, reorder at 30"}]}
+{"message": "the first one", "route": "simple_read", "earlier": [{"role": "user", "content": "stock of box"}, {"role": "assistant", "content": "Which box do you mean?\n1. Corrugated Box 12x12x12 (PAC-0001)\n2. Corrugated Box 18x12x10 (PAC-0002)"}]}
+{"message": "Why is padlock stock in BLR dropping?", "route": "investigation"}
+{"message": "Compare padlock movements across all warehouses this quarter and explain the differences.", "route": "investigation"}
+{"message": "Which customers pay late, and how much do they owe us?", "route": "investigation"}
+{"message": "Should I reorder padlocks for Delhi?", "route": "investigation"}
+{"message": "Why do our numbers not match the cycle count in BLR?", "route": "investigation"}
+{"message": "What happened to sticky notes stock in Mumbai in the monsoon?", "route": "investigation"}
+{"message": "padlock BLR mein kyu kam ho rahe hai?", "route": "investigation"}
+{"message": "why?", "route": "investigation", "earlier": [{"role": "user", "content": "How many padlocks are in Bangalore?"}, {"role": "assistant", "content": "There are 222 pcs of Padlock 50mm Brass (HAR-0018) in Bengaluru (BLR)."}]}
+{"message": "is that normal compared to last quarter?", "route": "investigation", "earlier": [{"role": "user", "content": "List padlock movements in BLR last month"}, {"role": "assistant", "content": "18 adjustments (-46 pcs), 6 sales (-120 pcs), 1 purchase (+200 pcs) in October."}]}
+{"message": "Is it fine?", "route": "clarify"}
+{"message": "Can you check the numbers?", "route": "clarify"}
+{"message": "send me the report", "route": "clarify"}
+{"message": "what about last week?", "route": "clarify"}
+{"message": "fix it", "route": "clarify"}
+{"message": "kya scene hai?", "route": "clarify"}
+{"message": "check that thing we talked about", "route": "clarify"}
+{"message": "hi, good morning!", "route": "smalltalk"}
+{"message": "thanks, that's all for today", "route": "smalltalk"}
+{"message": "What can you do?", "route": "smalltalk"}
+{"message": "ok", "route": "smalltalk"}
+{"message": "who made you?", "route": "smalltalk"}
+{"message": "namaste ji", "route": "smalltalk"}
+{"message": "great, thanks!", "route": "smalltalk", "earlier": [{"role": "user", "content": "Is INV-00903 paid?"}, {"role": "assistant", "content": "INV-00903 (Goswami-Mallick, BLR) is unpaid: 4,178.30 due 09/12/2026."}]}
+{"message": "you are slow today", "route": "smalltalk"}

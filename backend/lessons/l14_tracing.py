@@ -55,7 +55,7 @@ class Tracer:
         u = response.usage_metadata
         calls = response.function_calls or []
         self._write(
-            event="model_call", step=step, latency_ms=round(seconds * 1000),
+            event="model_call", step=step, model=response.model_version, latency_ms=round(seconds * 1000),
             prompt_tokens=u.prompt_token_count, output_tokens=u.candidates_token_count or 0,
             thinking_tokens=u.thoughts_token_count or 0,
             decision=[c.name for c in calls] or "final_answer",

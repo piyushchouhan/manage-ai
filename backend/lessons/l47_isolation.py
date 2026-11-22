@@ -33,6 +33,8 @@ from lessons.l41_history import load_messages, new_session
 from lessons.l46_memory import chat as chat_with_memory
 from lessons.l46_memory import ensure_tables as ensure_memory_tables
 from lessons.l46_memory import load_facts
+from lessons.l13_tools import WAREHOUSE
+from lessons.l61_typed_tools import DECLS_V7, TOOLS_V7, upper
 
 NEHA, RAVI = 3, 4  # Neha: DEL only. Ravi: BLR only. No warehouse in common.
 
@@ -66,9 +68,9 @@ def scope_for(ctx: UserContext):
     """-> scope(fn): wraps one tool. Checks the warehouse ASKED for, then filters what came BACK."""
     def scope(fn):
         def call(**args):
-            wh = args.get("warehouse_code")
-            if wh and wh not in ctx.warehouse_codes:
-                return denied(ctx, wh)
+            wh = upper(args.get("warehouse_code"))
+            if wh in WAREHOUSE["enum"] and wh not in ctx.warehouse_codes:  # a real warehouse they can't see
+                return denied(ctx, wh)  # anything invalid ("Bangalore") goes on: 6.1's typed check explains it
             return strip(ctx, fn(**args))
         return call
     return scope
@@ -103,11 +105,14 @@ def who(ctx: UserContext) -> str:
             f"{', '.join(sorted(ctx.warehouse_codes))}. Tools only return data from those.")
 
 
-def chat(user_id: int, session_id: int, text: str, tracer=None, log: list | None = None) -> str:
+def chat(user_id: int, session_id: int, text: str, tracer=None, log: list | None = None, **extra) -> str:
+    """**extra (4.8's on_context, 5.2's selected / extra_prompt) goes through 4.6 and 4.5 to 4.4."""
     check_owner(user_id, session_id)
     ctx = load_user(user_id)
+    extra_prompt = who(ctx) + extra.pop("extra_prompt", "")
     return chat_with_memory(session_id, text, user_id, tracer=tracer, log=log,
-                            extra_prompt=who(ctx), scope=scope_for(ctx))
+                            extra_prompt=extra_prompt, scope=scope_for(ctx),
+                            registry=TOOLS_V7, decls=DECLS_V7, **extra)  # 6.1: typed tools
 
 
 # --- The test --------------------------------------------------------------------------------

@@ -128,8 +128,9 @@ def tools_tokens(config) -> int:
     return tokens(json.dumps(decls))  # cached by tokens(): the same tool set is counted once
 
 
-def build_context(n_history: int):
-    """Returns the `prepare` hook for 1.2's loop. contents = history | question | this turn's work."""
+def build_context(n_history: int, on_context=None):
+    """Returns the `prepare` hook for 1.2's loop. contents = history | question | this turn's work.
+    on_context(contents, config, parts): 4.8 sees the final context of every call, to test it."""
     base = CONFIG_V6.system_instruction
 
     def prepare(contents: list[types.Content], config) -> list[types.Content]:
@@ -147,14 +148,17 @@ def build_context(n_history: int):
         print(f"   [context] {line} | total ~{sum(parts.values())}")
         for n in notes:
             print(f"   [trimmed] {n}")
-        return [*history, question, *work]
+        contents = [*history, question, *work]
+        if on_context:
+            on_context(contents, config, parts)
+        return contents
 
     return prepare
 
 
 def chat(session_id: int, text: str, tracer=None, log: list | None = None,
          tools: list[str] | None = None, use_history: bool = True,
-         extra_prompt: str = "", extra_tools: dict | None = None, **extra) -> str:
+         extra_prompt: str = "", extra_tools: dict | None = None, on_context=None, **extra) -> str:
     """4.3's turn (compacted history + summary) + 4.2's state, with every part on a budget.
     tools / use_history: 4.5 sends only what the question needs (default: everything).
     use_history=False still keeps the last user+assistant pair, but drops older turns and the summary.
@@ -164,7 +168,7 @@ def chat(session_id: int, text: str, tracer=None, log: list | None = None,
     history = trim_history(history) if use_history else history[-2:]  # always keep the last turn: cheap, and it holds the SKU
     memory = trim_text(summary_prompt(summary), BUDGET["memory"]) if use_history else ""
     return chat_with_state(session_id, text, tracer=tracer, log=log, history=history,
-                           extra_prompt=extra_prompt + memory, prepare=build_context(len(history)),
+                           extra_prompt=extra_prompt + memory, prepare=build_context(len(history), on_context),
                            tools=tools, extra_tools=extra_tools, **extra)
 
 
