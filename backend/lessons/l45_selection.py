@@ -37,15 +37,15 @@ from lessons.l44_budget import chat as chat_with_budget
 
 ALWAYS = ["search_products", "ask_user"]  # names -> SKUs, and asking back: any question may need them
 GROUPS = {
-    "stock": ["get_stock", "list_low_stock"],
+    "stock": ["get_stock", "list_low_stock", "list_suppliers"],  # list_suppliers: added in 7.3
     "movements": ["list_movements", "resolve_period"],
-    "invoices": ["get_invoice"],
+    "invoices": ["get_invoice", "list_unpaid_invoices"],  # the 2nd one: added in 7.2 (V7 tools only)
 }
 
 
 class Route(BaseModel):
     groups: list[Literal["stock", "movements", "invoices"]] = Field(description=(
-        "stock = current quantities, low stock; movements = history of stock changes, sales, "
+        "stock = current quantities, low stock, suppliers; movements = history of stock changes, sales, "
         "purchases, why stock changed, anything with a time period; invoices = who bought, "
         "payments, invoice details. Pick every group the question could need."
     ))

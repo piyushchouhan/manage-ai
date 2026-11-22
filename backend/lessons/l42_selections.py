@@ -132,7 +132,7 @@ def chat(session_id: int, text: str, tracer=None, log: list | None = None,
     state = load_state(session_id)
     config = CONFIG_V6.model_copy(update={
         "system_instruction": CONFIG_V6.system_instruction + extra_prompt + state_prompt(state),
-        "tools": [types.Tool(function_declarations=[decls[n] for n in (tools or decls)]
+        "tools": [types.Tool(function_declarations=[decls[n] for n in (tools or decls) if n in decls]
                                                    + [decl for _, decl in extra_tools.values()])],
     })
     log = [] if log is None else log

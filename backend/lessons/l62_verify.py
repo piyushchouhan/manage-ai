@@ -132,7 +132,8 @@ def check_fact(fact: Fact, log: list, registry: dict) -> tuple[bool, str]:
     return (True, f"DB: {truth}") if same(truth, fact.value) else (False, f"CAUGHT: DB says {truth}")
 
 
-NOT_NUMBERS = r"\d{1,2}/\d{1,2}/\d{4}|\d{4}-\d{2}-\d{2}|[A-Z]{2,}-\d+"  # dates, SKUs, invoice numbers
+# dates, SKUs, invoice numbers, and 7.2's citations like [step 2] / [note #11]
+NOT_NUMBERS = r"\d{1,2}/\d{1,2}/\d{4}|\d{4}-\d{2}-\d{2}|[A-Z]{2,}-\d+|\bstep \d+|#\d+"
 
 
 def numbers_in(text: str) -> list[float]:

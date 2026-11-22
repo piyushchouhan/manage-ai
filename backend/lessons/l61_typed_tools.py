@@ -35,9 +35,11 @@ from typing import Annotated, Literal
 
 from pydantic import BaseModel, BeforeValidator, ConfigDict, Field, ValidationError, model_validator
 
+from app.db import query
 from app.llm import types
 from lessons.common import header
 from lessons.l13_tools import SKU, WAREHOUSE
+from lessons.l22_tool_design import safe
 from lessons.l23_injection import recording
 from lessons.l32_dates import DateSpec
 from lessons.l33_clarify import ask
@@ -159,6 +161,106 @@ class PeriodResult(BaseModel):
     date_to: date | None
 
 
+# --- Added in 7.2: the planner showed there was no way to FIND unpaid invoices ----------------
+
+def list_unpaid_invoices(warehouse_code: str | None = None, overdue_only: bool = True, limit: int = 10) -> dict:
+    """Open balances per customer AND warehouse (so 4.7's filter can drop warehouses a user can't see)."""
+    rows = query(
+        """WITH open AS (
+             SELECT i.customer_id, i.warehouse_id, i.due_date,
+                    i.total - COALESCE((SELECT SUM(amount) FROM payments p WHERE p.invoice_id = i.id), 0) AS balance
+             FROM invoices i
+             WHERE i.status IN ('unpaid', 'partially_paid')
+               AND (NOT :overdue OR i.due_date < CURRENT_DATE))
+           SELECT c.name AS customer, w.code AS warehouse, COUNT(*) AS open_invoices,
+                  ROUND(SUM(o.balance)::numeric, 2) AS outstanding, MIN(o.due_date) AS oldest_due,
+                  CURRENT_DATE - MIN(o.due_date) AS days_overdue, c.credit_limit,
+                  (SELECT COALESCE(SUM(p.amount), 0) FROM payments p JOIN invoices i2 ON i2.id = p.invoice_id
+                   WHERE i2.customer_id = c.id AND i2.warehouse_id = w.id) AS paid_ever
+           FROM open o JOIN customers c ON c.id = o.customer_id JOIN warehouses w ON w.id = o.warehouse_id
+           WHERE CAST(:wh AS text) IS NULL OR w.code = :wh
+           GROUP BY c.id, c.name, w.id, w.code, c.credit_limit
+           ORDER BY outstanding DESC LIMIT :limit""",
+        overdue=overdue_only, wh=warehouse_code, limit=limit,
+    )
+    return {"count": len(rows), "customers": rows}
+
+
+class UnpaidArgs(Args):
+    warehouse_code: Warehouse | None = Field(None, description=WAREHOUSE["description"] + " Omit for all.")
+    overdue_only: bool = Field(True, description="True = only invoices past their due date.")
+    limit: int = Field(10, ge=1, le=25, description="Rows to return, biggest outstanding first. 1-25.")
+
+
+class UnpaidRow(BaseModel):
+    customer: str
+    warehouse: str
+    open_invoices: int
+    outstanding: float
+    oldest_due: date
+    days_overdue: int
+    credit_limit: float
+    paid_ever: float
+
+
+class UnpaidResult(BaseModel):
+    count: int
+    customers: list[UnpaidRow]
+
+
+UNPAID_DESCRIPTION = (
+    "Customers who owe money: open (unpaid or partly paid) invoices per customer and warehouse, biggest "
+    "outstanding first. Each row: open_invoices, outstanding, oldest_due, days_overdue, credit_limit, and "
+    "paid_ever (0 = this customer has never paid anything at this warehouse). Use it for questions about "
+    "who owes us, late payers, cash flow, credit limits."
+)
+
+
+# --- Added in 7.3: nothing could see suppliers, so "why do things keep running low?" had no answer ---
+
+def list_suppliers(warehouse_code: str | None = None) -> dict:
+    """Per supplier AND warehouse (4.7's filter drops warehouses a user can't see)."""
+    rows = query(
+        """SELECT s.name AS supplier, w.code AS warehouse, s.lead_time_days,
+                  COUNT(*) AS products,
+                  COUNT(*) FILTER (WHERE sl.quantity < p.reorder_level) AS low_now,
+                  COUNT(*) FILTER (WHERE sl.quantity = 0) AS out_now
+           FROM suppliers s JOIN products p ON p.supplier_id = s.id
+           JOIN stock_levels sl ON sl.product_id = p.id JOIN warehouses w ON w.id = sl.warehouse_id
+           WHERE CAST(:wh AS text) IS NULL OR w.code = :wh
+           GROUP BY s.id, s.name, s.lead_time_days, w.code
+           ORDER BY s.lead_time_days DESC, low_now DESC, w.code""",
+        wh=warehouse_code,
+    )
+    return {"count": len(rows), "suppliers": rows}
+
+
+class SupplierArgs(Args):
+    warehouse_code: Warehouse | None = Field(None, description=WAREHOUSE["description"] + " Omit for all.")
+
+
+class SupplierRow(BaseModel):
+    supplier: str
+    warehouse: str
+    lead_time_days: int = Field(ge=0)
+    products: int
+    low_now: int
+    out_now: int
+
+
+class SupplierResult(BaseModel):
+    count: int
+    suppliers: list[SupplierRow]
+
+
+SUPPLIERS_DESCRIPTION = (
+    "Suppliers and how their products are doing, per supplier and warehouse, slowest supplier first. Each row: "
+    "lead_time_days (days from order to delivery), products (how many of its products this warehouse stocks), "
+    "low_now (how many are below reorder level right now), out_now (how many are at 0). Use it for questions "
+    "about suppliers, deliveries, lead times, or why products keep running low."
+)
+
+
 # --- The wrapper --------------------------------------------------------------------------------
 
 def problems(e: ValidationError) -> list[dict]:
@@ -199,11 +301,20 @@ SPECS = {  # name -> (args model, result model). ask_user stays as it is: it rai
     "search_products": (SearchArgs, SearchResult),
     "list_low_stock": (LowStockArgs, LowStockResult),
     "resolve_period": (DateSpec, PeriodResult),
+    "list_unpaid_invoices": (UnpaidArgs, UnpaidResult),  # 7.2
+    "list_suppliers": (SupplierArgs, SupplierResult),  # 7.3
 }
 
-TOOLS_V7 = {**TOOLS_V6, **{n: typed(TOOLS_V6[n], a, r) for n, (a, r) in SPECS.items()}}
+NEW_TOOLS = {  # tools added after V6: name -> (function, description)
+    "list_unpaid_invoices": (list_unpaid_invoices, UNPAID_DESCRIPTION),
+    "list_suppliers": (list_suppliers, SUPPLIERS_DESCRIPTION),
+}
+RAW_TOOLS = {**TOOLS_V6, **{n: safe(fn) for n, (fn, _) in NEW_TOOLS.items()}}
+DESCRIPTIONS = {**{n: d.description for n, d in DECLS_V6.items()}, **{n: d for n, (_, d) in NEW_TOOLS.items()}}
+
+TOOLS_V7 = {**RAW_TOOLS, **{n: typed(RAW_TOOLS[n], a, r) for n, (a, r) in SPECS.items()}}
 DECLS_V7 = {**DECLS_V6, **{n: types.FunctionDeclaration(  # same descriptions, schema FROM the Args model
-    name=n, description=DECLS_V6[n].description, parameters_json_schema=a.model_json_schema(),
+    name=n, description=DESCRIPTIONS[n], parameters_json_schema=a.model_json_schema(),
 ) for n, (a, _) in SPECS.items()}}
 CONFIG_V7 = CONFIG_V6.model_copy(update={"tools": [types.Tool(function_declarations=list(DECLS_V7.values()))]})
 

@@ -129,8 +129,9 @@ HANDLERS = {"smalltalk": smalltalk, "clarify": clarify, "simple_read": simple_re
 
 # --- One chat turn ---------------------------------------------------------------------------
 
-def chat(user_id: int, session_id: int, text: str, tracer=None, log: list | None = None) -> tuple[str, str]:
-    """-> (reply, the path that ran)"""
+def chat(user_id: int, session_id: int, text: str, tracer=None, log: list | None = None,
+         handlers: dict = HANDLERS) -> tuple[str, str]:
+    """-> (reply, the path that ran). handlers: 7.3 swaps in the planner/workers investigation."""
     check_owner(user_id, session_id)
     if load_state(session_id)["pending"]:  # answering our question: no routing, the agent has the options
         print("   [dispatch] pending choice -> simple_read, no router")
@@ -138,7 +139,7 @@ def chat(user_id: int, session_id: int, text: str, tracer=None, log: list | None
     d = decide(user_id, session_id, text, tracer)
     path = pick(d)
     print(f"   [dispatch] {d.route} ({d.confidence:.2f}) -> {path}: {d.reason}")
-    return HANDLERS[path](user_id, session_id, text, d, tracer=tracer, log=log), path
+    return handlers[path](user_id, session_id, text, d, tracer=tracer, log=log), path
 
 
 # --- Experiments ------------------------------------------------------------------------------
