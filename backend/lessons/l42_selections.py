@@ -117,19 +117,28 @@ def state_prompt(state: dict) -> str:
 # --- One chat turn: 4.1's turn + state ------------------------------------------------
 
 def chat(session_id: int, text: str, tracer=None, log: list | None = None,
-         history: list[types.Content] | None = None, extra_prompt: str = "", prepare=None) -> str:
+         history: list[types.Content] | None = None, extra_prompt: str = "", prepare=None,
+         tools: list[str] | None = None, extra_tools: dict | None = None, scope=None) -> str:
     """log: pass a list to see every tool call afterwards (the experiments check SKUs with it).
     history / extra_prompt: 4.3 passes a compacted history and the running summary; default = full history.
-    prepare: 4.4's budget check, run before every model call."""
+    prepare: 4.4's budget check, run before every model call.
+    tools: 4.5 sends only these tool declarations (names from DECLS_V6); default = all.
+    extra_tools: 4.6 adds per-user tools, {name: (function, declaration)}, always sent.
+    scope: 4.7 wraps EVERY tool, scope(fn) -> fn, so results are limited to the user's warehouses."""
+    extra_tools = extra_tools or {}
     state = load_state(session_id)
     config = CONFIG_V6.model_copy(update={
-        "system_instruction": CONFIG_V6.system_instruction + extra_prompt + state_prompt(state)
+        "system_instruction": CONFIG_V6.system_instruction + extra_prompt + state_prompt(state),
+        "tools": [types.Tool(function_declarations=[DECLS_V6[n] for n in (tools or DECLS_V6)]
+                                                   + [decl for _, decl in extra_tools.values()])],
     })
     log = [] if log is None else log
     if history is None:
         history = to_history(load_messages(session_id))
     result = run_turn(text, tracer=tracer, history=history,
-                      config=config, registry=recording(TOOLS_V6, log), prepare=prepare)
+                      config=config, prepare=prepare,
+                      registry=recording({n: scope(fn) if scope else fn for n, fn in
+                                          {**TOOLS_V6, **{n: fn for n, (fn, _) in extra_tools.items()}}.items()}, log))
 
     if isinstance(result, Clarification):  # the agent is waiting on the user
         state = {"selection": result.options,

@@ -12,6 +12,8 @@
     chat_sessions ──< chat_messages                  (saved chat history, lesson 4.1)
                  ──  chat_state                     (last list shown + pending question, 4.2)
                  ──  chat_summaries                 (running summary of old turns, 4.3)
+    users ──< user_memories                          (long-term facts about a user, 4.6)
+    ops_notes  (staff logbook + pgvector embeddings, 4.6; created by scripts/enable_vector_search.py)
 """
 
 from datetime import date, datetime
@@ -192,6 +194,7 @@ class UserWarehouseAccess(Base):
 class ChatSession(Base):
     __tablename__ = "chat_sessions"
     id: Mapped[int] = mapped_column(primary_key=True)
+    user_id: Mapped[int | None] = mapped_column(ForeignKey("users.id"))  # owner (lesson 4.7)
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
 
 
@@ -219,3 +222,12 @@ class ChatSummary(Base):
     session_id: Mapped[int] = mapped_column(ForeignKey("chat_sessions.id"), primary_key=True)
     summary: Mapped[str] = mapped_column(Text, default="")
     upto_id: Mapped[int] = mapped_column(Integer, default=0)
+
+
+class UserMemory(Base):
+    """Long-term memory (lesson 4.6): lasting facts about a user, kept across chat sessions."""
+    __tablename__ = "user_memories"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), index=True)
+    fact: Mapped[str] = mapped_column(Text)
+    created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())

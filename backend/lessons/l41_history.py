@@ -42,9 +42,10 @@ def ensure_tables():
 
 # --- The store: plain DB functions. Owner engine, because the AI's read-only role can't write. ---
 
-def new_session() -> int:
+def new_session(user_id: int | None = None) -> int:
+    """user_id: the owner (4.7). Only the owner may read or continue this chat."""
     with SessionLocal() as db:
-        s = ChatSession()
+        s = ChatSession(user_id=user_id)
         db.add(s)
         db.commit()
         return s.id

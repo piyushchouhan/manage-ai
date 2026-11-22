@@ -123,10 +123,9 @@ def trim_text(text: str, max_tokens: int) -> str:
 
 # --- build_context: runs before EVERY model call -------------------------------------------
 
-@lru_cache(maxsize=1)
-def tools_tokens() -> int:
-    decls = [d.model_dump(exclude_none=True) for d in CONFIG_V6.tools[0].function_declarations]
-    return tokens(json.dumps(decls))
+def tools_tokens(config) -> int:
+    decls = [d.model_dump(exclude_none=True) for d in config.tools[0].function_declarations]
+    return tokens(json.dumps(decls))  # cached by tokens(): the same tool set is counted once
 
 
 def build_context(n_history: int):
@@ -138,7 +137,7 @@ def build_context(n_history: int):
         work, notes = trim_work(work)
         parts = {
             "system": tokens(base),
-            "tools": tools_tokens(),
+            "tools": tools_tokens(config),
             "memory": tokens(config.system_instruction[len(base):]),
             "history": count(history),
             "question": count([question]),
@@ -153,13 +152,20 @@ def build_context(n_history: int):
     return prepare
 
 
-def chat(session_id: int, text: str, tracer=None, log: list | None = None) -> str:
-    """4.3's turn (compacted history + summary) + 4.2's state, with every part on a budget."""
+def chat(session_id: int, text: str, tracer=None, log: list | None = None,
+         tools: list[str] | None = None, use_history: bool = True,
+         extra_prompt: str = "", extra_tools: dict | None = None, **extra) -> str:
+    """4.3's turn (compacted history + summary) + 4.2's state, with every part on a budget.
+    tools / use_history: 4.5 sends only what the question needs (default: everything).
+    use_history=False still keeps the last user+assistant pair, but drops older turns and the summary.
+    extra_prompt / extra_tools: 4.6's long-term memory and its tools, passed through to 4.2.
+    **extra (4.7's scope) goes straight to 4.2."""
     history, summary, _ = compacted_history(session_id)
-    history = trim_history(history)
-    memory = trim_text(summary_prompt(summary), BUDGET["memory"])
+    history = trim_history(history) if use_history else history[-2:]  # always keep the last turn: cheap, and it holds the SKU
+    memory = trim_text(summary_prompt(summary), BUDGET["memory"]) if use_history else ""
     return chat_with_state(session_id, text, tracer=tracer, log=log, history=history,
-                           extra_prompt=memory, prepare=build_context(len(history)))
+                           extra_prompt=extra_prompt + memory, prepare=build_context(len(history)),
+                           tools=tools, extra_tools=extra_tools, **extra)
 
 
 def main():
