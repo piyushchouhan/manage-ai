@@ -37,7 +37,7 @@ import time
 import uuid
 from contextlib import contextmanager
 from dataclasses import dataclass
-from datetime import date
+from datetime import date, datetime
 
 from sqlalchemy import text
 
@@ -171,7 +171,7 @@ PER_MODEL = """
 
 def rows(sql: str, since: str) -> list[dict]:
     with SessionLocal() as db:
-        return [dict(r) for r in db.execute(text(sql), {"since": since}).mappings()]
+        return [dict(r) for r in db.execute(text(sql), {"since": datetime.fromisoformat(since)}).mappings()]
 
 
 def usd(x) -> str:
@@ -222,14 +222,19 @@ def report(since: str):
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--traffic", action="store_true", help="run 11.1's golden questions first (~5 min)")
-    ap.add_argument("--since", default=f"{date.today():%Y-%m-%d}", help="report runs since this date (YYYY-MM-DD)")
+    ap.add_argument("--since", default=f"{date.today():%Y-%m-%d}", help="report since 'YYYY-MM-DD [HH:MM]'")
     args = ap.parse_args()
-    install()
+    # `python -m` loads this file TWICE: as __main__ and as lessons.l112_observability (which l81 imports).
+    # Two modules = two RUN variables. Use the imported one everywhere, or calls never find their run.
+    from lessons import l112_observability as obs
+    obs.install()
+    since = args.since
     if args.traffic:
         from lessons import l111_evals
+        since = f"{datetime.now():%Y-%m-%d %H:%M:%S}"  # report only this traffic
         sys.argv = ["l111_evals", "--no-judge"]  # the judge isn't part of the product: keep it out
         l111_evals.main()
-    report(args.since)
+    obs.report(since)
 
 
 if __name__ == "__main__":
