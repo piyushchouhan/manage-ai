@@ -31,8 +31,9 @@ Experiments:
 import json
 import time
 
-from app.llm import ROUTER_MODEL, client, types
+from app.llm import ROUTER_MODEL, types
 from lessons.common import header
+from lessons.l12_agent_loop import generate
 from lessons.l14_tracing import Tracer
 from lessons.l21_permissions import load_user
 from lessons.l41_history import new_session, save_turn
@@ -86,12 +87,9 @@ CAN_DO = "You can look up stock, low stock, stock movements, invoices, payments 
 def reply_without_data(user_id: int, session_id: int, text: str, instruction: str, tracer=None) -> str:
     """smalltalk and clarify: one cheap call, no tools, so no data can be fetched or invented."""
     t0 = time.perf_counter()
-    r = client.models.generate_content(
-        model=ROUTER_MODEL, contents=text,
-        config=types.GenerateContentConfig(
-            system_instruction=f"You are a warehouse assistant. {CAN_DO}{who(load_user(user_id))}\n\n{instruction}",
-        ),
-    )
+    r = generate(text, types.GenerateContentConfig(
+        system_instruction=f"You are a warehouse assistant. {CAN_DO}{who(load_user(user_id))}\n\n{instruction}",
+    ), getattr(tracer, "on_token", None), model=ROUTER_MODEL)  # streamed too when the tracer wants it (8.3)
     if tracer:
         tracer.model_call(1, r, time.perf_counter() - t0)
     reply = r.text.strip()
@@ -124,21 +122,33 @@ def investigation(user_id, session_id, text, d, tracer=None, log=None) -> str:
                       extra_prompt=INVESTIGATE)
 
 
-HANDLERS = {"smalltalk": smalltalk, "clarify": clarify, "simple_read": simple_read, "investigation": investigation}
+def pending(user_id, session_id, text, d, tracer=None, log=None) -> str:
+    """The user is answering our question ("which box?"): the agent has the options, no routing."""
+    return agent_chat(user_id, session_id, text, tracer=tracer, log=log)
+
+
+HANDLERS = {"smalltalk": smalltalk, "clarify": clarify, "simple_read": simple_read, "investigation": investigation,
+            "pending": pending}
 
 
 # --- One chat turn ---------------------------------------------------------------------------
 
-def chat(user_id: int, session_id: int, text: str, tracer=None, log: list | None = None,
-         handlers: dict = HANDLERS) -> tuple[str, str]:
-    """-> (reply, the path that ran). handlers: 7.3 swaps in the planner/workers investigation."""
+def choose(user_id: int, session_id: int, text: str, tracer=None) -> tuple[str, Decision | None]:
+    """-> (path, the router's decision). 8.1's API calls this alone, to decide BEFORE running anything."""
     check_owner(user_id, session_id)
-    if load_state(session_id)["pending"]:  # answering our question: no routing, the agent has the options
-        print("   [dispatch] pending choice -> simple_read, no router")
-        return agent_chat(user_id, session_id, text, tracer=tracer, log=log), "simple_read (pending)"
+    if load_state(session_id)["pending"]:  # answering our question: "2" can't be routed
+        print("   [dispatch] pending choice -> no router")
+        return "pending", None
     d = decide(user_id, session_id, text, tracer)
     path = pick(d)
     print(f"   [dispatch] {d.route} ({d.confidence:.2f}) -> {path}: {d.reason}")
+    return path, d
+
+
+def chat(user_id: int, session_id: int, text: str, tracer=None, log: list | None = None,
+         handlers: dict = HANDLERS) -> tuple[str, str]:
+    """-> (reply, the path that ran). handlers: 7.3 swaps in the planner/workers investigation."""
+    path, d = choose(user_id, session_id, text, tracer)
     return handlers[path](user_id, session_id, text, d, tracer=tracer, log=log), path
 
 

@@ -65,6 +65,27 @@ class TooManySteps(Exception):
 
 # --- THE AGENT LOOP -----------------------------------------------------------
 
+def generate(contents, config: types.GenerateContentConfig, on_token=None,
+             model: str = MODEL) -> types.GenerateContentResponse:
+    """One model call. on_token (8.3): stream it, handing each piece of text out as it arrives;
+    the pieces are put back together into one normal response, so the loop below doesn't change."""
+    if on_token is None:
+        return client.models.generate_content(model=model, contents=contents, config=config)
+    parts, last = [], None
+    for chunk in client.models.generate_content_stream(model=model, contents=contents, config=config):
+        last = chunk
+        content = chunk.candidates[0].content if chunk.candidates else None
+        for p in (content.parts if content and content.parts else []):
+            parts.append(p)  # all parts kept: function calls and their thought signatures too
+            if p.text and not p.thought:
+                on_token(p.text)
+    return types.GenerateContentResponse(
+        candidates=[types.Candidate(content=types.Content(role="model", parts=parts))],
+        usage_metadata=last.usage_metadata if last else None,
+        model_version=last.model_version if last else None,
+    )
+
+
 def run_agent(
     question: str,
     config: types.GenerateContentConfig = CONFIG,
@@ -86,7 +107,8 @@ def run_agent(
         if prepare:
             contents = prepare(contents, config)
         t0 = time.perf_counter()
-        response = client.models.generate_content(model=MODEL, contents=contents, config=config)
+        # a tracer with on_token (8.3's StreamTracer) gets the answer streamed, piece by piece
+        response = generate(contents, config, getattr(tracer, "on_token", None))
         if tracer:
             tracer.model_call(step, response, time.perf_counter() - t0)
         tokens = response.usage_metadata.prompt_token_count

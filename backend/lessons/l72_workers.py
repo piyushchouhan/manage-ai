@@ -31,6 +31,7 @@ Experiments:
 
 import json
 import time
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from datetime import date
 
@@ -177,9 +178,15 @@ class Investigation:
     who_text: str
 
 
-def gather(question: str, user_id: int) -> Investigation:
-    """Plan, then run one worker per step. Everything except writing the answer."""
+def quiet(_: str):
+    pass
+
+
+def gather(question: str, user_id: int, progress: Callable[[str], None] = quiet) -> Investigation:
+    """Plan, then run one worker per step. Everything except writing the answer.
+    progress: 8.2 shows these short messages in the UI while a job runs."""
     who_text = who(load_user(user_id))
+    progress("planning the investigation")
     p: Plan = plan(question)
     print(f"\n   PLAN: {p.approach}")
     for s in p.steps:
@@ -192,6 +199,7 @@ def gather(question: str, user_id: int) -> Investigation:
     tools = numbered(clean, log)   # one shared log: call_ids unique across all workers
     evidence: list[Evidence] = []
     for s in p.steps:
+        progress(f"step {s.step}/{len(p.steps)}: {s.goal}")
         start = len(log)
         finding = run_worker(s, evidence, tools, who_text)
         evidence.append(Evidence(s.step, s.goal, finding, list(range(start + 1, len(log) + 1))))

@@ -44,7 +44,7 @@ from lessons.l52_dispatch import HANDLERS, calls
 from lessons.l52_dispatch import chat as dispatch_chat
 from lessons.l62_verify import numbers_in, same
 from lessons.l63_rules import RULES, Context, safe_failure
-from lessons.l72_workers import Report, gather, show_report, synthesize
+from lessons.l72_workers import Report, gather, quiet, show_report, synthesize
 
 ASHA = 1
 RETRIES = 1  # one rewrite: the synthesizer usually fixes a bad citation; a second try rarely helps
@@ -62,14 +62,16 @@ def with_sources(report: Report, log: list) -> str:
     return report.summary + "\n\nSources:\n" + "\n".join(lines)
 
 
-def investigate(question: str, user_id: int, retries: int = RETRIES) -> tuple[str, bool]:
-    """-> (reply for the user, verified?)"""
+def investigate(question: str, user_id: int, retries: int = RETRIES, progress=quiet) -> tuple[str, bool]:
+    """-> (reply for the user, verified?). progress: 8.2's status messages for the UI."""
     t0 = time.perf_counter()
-    inv = gather(question, user_id)
+    inv = gather(question, user_id, progress)
     c = Context(question, load_user(user_id), inv.clean)
     feedback, report = "", None
     for attempt in range(1, retries + 2):
+        progress("writing the answer" if attempt == 1 else "rewriting: the checks rejected the first draft")
         report = synthesize(question, inv.evidence, inv.log, inv.who_text, feedback)
+        progress("checking every number against the database")
         problems = show_report(report, inv.evidence, inv.log, inv.clean)
         problems += [f"{name}: {p}" for name, rule in EXTRA_RULES.items() for p in rule(report, inv.log, c)]
         took = f"{len(inv.plan.steps)} steps · {len(inv.log)} tool calls · {time.perf_counter() - t0:.0f}s"
@@ -85,9 +87,9 @@ def investigate(question: str, user_id: int, retries: int = RETRIES) -> tuple[st
     return safe_failure(report, inv.log, c), False
 
 
-def investigation(user_id, session_id, text, d, tracer=None, log=None) -> str:
+def investigation(user_id, session_id, text, d, tracer=None, log=None, progress=quiet) -> str:
     """5.2's investigation handler, now planner -> workers -> synthesizer -> validator."""
-    reply, _ = investigate(text, user_id)
+    reply, _ = investigate(text, user_id, progress=progress)
     save_turn(session_id, text, reply)
     return reply
 

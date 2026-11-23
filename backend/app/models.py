@@ -13,6 +13,7 @@
                  ──  chat_state                     (last list shown + pending question, 4.2)
                  ──  chat_summaries                 (running summary of old turns, 4.3)
     users ──< user_memories                          (long-term facts about a user, 4.6)
+    chat_sessions ──< jobs                           (investigations run in the background, 8.1)
     ops_notes  (staff logbook + pgvector embeddings, 4.6; created by scripts/enable_vector_search.py)
 """
 
@@ -231,3 +232,20 @@ class UserMemory(Base):
     user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), index=True)
     fact: Mapped[str] = mapped_column(Text)
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
+
+
+# ---------- Background jobs (lesson 8.1) ----------
+
+class Job(Base):
+    """One investigation, run after /api/chat has already answered with its id. The UI polls it."""
+    __tablename__ = "jobs"
+    __table_args__ = (CheckConstraint("status IN ('queued','running','done','failed')"),)
+    id: Mapped[int] = mapped_column(primary_key=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), index=True)  # only the owner may poll it
+    session_id: Mapped[int] = mapped_column(ForeignKey("chat_sessions.id"))
+    question: Mapped[str] = mapped_column(Text)
+    status: Mapped[str] = mapped_column(String(20), default="queued")
+    reply: Mapped[str | None] = mapped_column(Text)
+    progress: Mapped[str | None] = mapped_column(Text)  # "step 2/3: checking movements" (8.2)
+    created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
+    finished_at: Mapped[datetime | None] = mapped_column(DateTime)
