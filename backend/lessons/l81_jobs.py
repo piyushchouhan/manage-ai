@@ -55,6 +55,7 @@ from lessons.l41_history import new_session, save_turn
 from lessons.l47_isolation import ensure_tables as ensure_chat_tables
 from lessons.l52_dispatch import choose
 from lessons.l73_investigation import HANDLERS_V2
+from lessons.l112_observability import observe
 
 FAILED = "Sorry, the investigation failed before it finished. Please ask again."
 RESTARTED = "Sorry, the server restarted while this investigation was running. Please ask again."
@@ -146,8 +147,9 @@ def run_job(job_id: int):
         user_id, session_id, question = job.user_id, job.session_id, job.question
     set_job(job_id, "running")
     try:
-        reply = HANDLERS_V2["investigation"](user_id, session_id, question, None,  # 7.3: also saves the turn
-                                             progress=lambda p: set_progress(job_id, p))
+        with observe(user_id, question, route="investigation job"):  # 11.2: cost and time of the job
+            reply = HANDLERS_V2["investigation"](user_id, session_id, question, None,  # 7.3: also saves the turn
+                                                 progress=lambda p: set_progress(job_id, p))
         set_job(job_id, "done", reply)
     except Exception:
         traceback.print_exc()  # the details stay in the server log, not in the chat
@@ -170,12 +172,14 @@ def start_turn(user_id: int, session_id: int, text: str, background, tracer=None
     """background: anything with add_task(fn, *args), e.g. FastAPI's BackgroundTasks.
     handlers: the quick paths (9.2 adds tables and follow-ups to simple reads).
     -> {"path", "reply"} for a quick path, or {"path", "job_id"} for an investigation."""
-    path, d = choose(user_id, session_id, text, tracer)
-    if path == "investigation":
-        job_id = create_job(user_id, session_id, text)
-        background.add_task(run_job, job_id)  # runs AFTER this response is sent
-        return {"path": path, "job_id": job_id}
-    return {"path": path, "reply": handlers[path](user_id, session_id, text, d, tracer=tracer)}
+    with observe(user_id, text) as run:  # 11.2: every model call below is counted against this request
+        path, d = choose(user_id, session_id, text, tracer)
+        run["route"] = path
+        if path == "investigation":
+            job_id = create_job(user_id, session_id, text)
+            background.add_task(run_job, job_id)  # runs AFTER this response is sent
+            return {"path": path, "job_id": job_id}
+        return {"path": path, "reply": handlers[path](user_id, session_id, text, d, tracer=tracer)}
 
 
 # --- Experiments ------------------------------------------------------------------------------------

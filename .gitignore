@@ -16,3 +16,6 @@ dist/
 .DS_Store
 traces/
 ~$*.xlsx
+
+# eval runs (lesson 11.1): local history for regression comparison
+backend/evals/results/

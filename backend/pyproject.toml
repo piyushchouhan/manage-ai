@@ -9,4 +9,9 @@ dependencies = [
     "python-dotenv>=1.0",
     "faker>=30.0",
     "google-genai>=3.3.0",
+    "fastapi>=0.163.0",
+    "uvicorn[standard]>=0.54.0",
+    "arq>=0.28.0",
+    "langgraph>=1.2.24",
+    "langgraph-checkpoint-postgres>=3.2.1",
 ]

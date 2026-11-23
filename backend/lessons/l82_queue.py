@@ -46,6 +46,7 @@ from redis.exceptions import RedisError
 from app.config import REDIS_URL
 from lessons.common import header
 from lessons.l81_jobs import PORT, call, ensure_tables, fail_job, get_job, run_job
+from lessons.l112_observability import install
 
 REDIS = RedisSettings.from_dsn(REDIS_URL)
 JOB_TIMEOUT = 300  # seconds; investigations take ~2 min. Also how long a crashed job's lock lasts.
@@ -81,8 +82,13 @@ async def run_job_async(ctx, job_id: int):
     await asyncio.to_thread(run_job, job_id)
 
 
+async def on_startup(ctx):
+    install()  # 11.2: count every model call this worker makes
+
+
 class WorkerSettings:
     functions = [func(run_job_async, name="run_job", timeout=JOB_TIMEOUT)]  # name = what the API pushes
+    on_startup = on_startup
     redis_settings = REDIS
     max_jobs = 4  # investigations at the same time, per worker process
 

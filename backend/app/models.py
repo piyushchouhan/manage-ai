@@ -14,6 +14,7 @@
                  ──  chat_summaries                 (running summary of old turns, 4.3)
     users ──< user_memories                          (long-term facts about a user, 4.6)
     chat_sessions ──< jobs                           (investigations run in the background, 8.1)
+    agent_runs ──< llm_calls                         (every model call: tokens, latency, cost, 11.2)
     ops_notes  (staff logbook + pgvector embeddings, 4.6; created by scripts/enable_vector_search.py)
 """
 
@@ -21,9 +22,11 @@ from datetime import date, datetime
 from decimal import Decimal
 
 from sqlalchemy import (
+    Boolean,
     CheckConstraint,
     Date,
     DateTime,
+    Float,
     ForeignKey,
     JSON,
     Integer,
@@ -250,3 +253,32 @@ class Job(Base):
     progress: Mapped[str | None] = mapped_column(Text)  # "step 2/3: checking movements" (8.2)
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
     finished_at: Mapped[datetime | None] = mapped_column(DateTime)
+
+
+# ---------- Observability (lesson 11.2) ----------
+
+class AgentRun(Base):
+    """One request through the assistant (a chat turn, or an investigation job), with its route."""
+    __tablename__ = "agent_runs"
+    id: Mapped[str] = mapped_column(String(32), primary_key=True)
+    route: Mapped[str] = mapped_column(String(40), index=True)
+    user_id: Mapped[int | None] = mapped_column(Integer)
+    question: Mapped[str] = mapped_column(Text)
+    seconds: Mapped[float] = mapped_column(Float)
+    ok: Mapped[bool] = mapped_column(Boolean)
+    created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
+
+
+class LlmCall(Base):
+    """One model call. run_id is NULL for calls outside a request (e.g. the eval's judge)."""
+    __tablename__ = "llm_calls"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    run_id: Mapped[str | None] = mapped_column(String(32), index=True)
+    model: Mapped[str] = mapped_column(String(60))
+    prompt_tokens: Mapped[int] = mapped_column(Integer, default=0)
+    cached_tokens: Mapped[int] = mapped_column(Integer, default=0)
+    output_tokens: Mapped[int] = mapped_column(Integer, default=0)
+    thinking_tokens: Mapped[int] = mapped_column(Integer, default=0)
+    latency_ms: Mapped[int] = mapped_column(Integer)
+    cost_usd: Mapped[Decimal | None] = mapped_column(Numeric(12, 6))  # NULL = no price known for this model
+    created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())

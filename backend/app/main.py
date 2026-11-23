@@ -42,8 +42,10 @@ from lessons.l81_jobs import get_job, start_turn
 from lessons.l82_queue import ArqQueue
 from lessons.l83_streaming import job_events, stream_turn
 from lessons.l92_rendering import HANDLERS_V3, ensure_tables
+from lessons.l112_observability import install
 
 ensure_tables()  # no fail_stale() any more (8.1): running jobs belong to the worker, not to this process
+install()  # 11.2: every model call -> llm_calls (tokens, latency, cost); report: lessons.l112_observability
 queue = ArqQueue()
 app = FastAPI(title="Manage AI")
 

@@ -128,3 +128,17 @@
     @apply font-sans;
     }
 }
+/* Assistant replies are markdown (see App.tsx) */
+@layer components {
+  .markdown > * + * { @apply mt-2; }
+  .markdown strong { @apply font-semibold; }
+  .markdown ul { @apply list-disc pl-5; }
+  .markdown ol { @apply list-decimal pl-5; }
+  .markdown li + li { @apply mt-1; }
+  .markdown h1, .markdown h2, .markdown h3 { @apply mt-3 font-semibold; }
+  .markdown code { @apply rounded bg-muted px-1 py-0.5 font-mono text-xs; }
+  .markdown hr { @apply my-3; }
+  .markdown table { @apply w-full border-collapse text-xs; }
+  .markdown th, .markdown td { @apply border px-2 py-1 text-left; }
+  .markdown th { @apply bg-muted font-medium; }
+}
