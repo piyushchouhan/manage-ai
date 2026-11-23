@@ -165,15 +165,17 @@ def fail_stale() -> int:
 
 # --- One chat turn, two speeds ----------------------------------------------------------------------
 
-def start_turn(user_id: int, session_id: int, text: str, background, tracer=None) -> dict:
+def start_turn(user_id: int, session_id: int, text: str, background, tracer=None,
+               handlers: dict = HANDLERS_V2) -> dict:
     """background: anything with add_task(fn, *args), e.g. FastAPI's BackgroundTasks.
+    handlers: the quick paths (9.2 adds tables and follow-ups to simple reads).
     -> {"path", "reply"} for a quick path, or {"path", "job_id"} for an investigation."""
     path, d = choose(user_id, session_id, text, tracer)
     if path == "investigation":
         job_id = create_job(user_id, session_id, text)
         background.add_task(run_job, job_id)  # runs AFTER this response is sent
         return {"path": path, "job_id": job_id}
-    return {"path": path, "reply": HANDLERS_V2[path](user_id, session_id, text, d, tracer=tracer)}
+    return {"path": path, "reply": handlers[path](user_id, session_id, text, d, tracer=tracer)}
 
 
 # --- Experiments ------------------------------------------------------------------------------------

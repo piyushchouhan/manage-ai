@@ -108,8 +108,8 @@ def clarify(user_id, session_id, text, d, tracer=None, log=None) -> str:
                               "what they need, with 2-3 examples of what you can check.", tracer)
 
 
-def simple_read(user_id, session_id, text, d, tracer=None, log=None) -> str:
-    return agent_chat(user_id, session_id, text, tracer=tracer, log=log, selected=d)
+def simple_read(user_id, session_id, text, d, tracer=None, log=None, **extra) -> str:
+    return agent_chat(user_id, session_id, text, tracer=tracer, log=log, selected=d, **extra)
 
 
 INVESTIGATE = ("\n\nThis is an INVESTIGATION. Gather evidence from several tools (movements, notes, invoices) "
@@ -122,9 +122,9 @@ def investigation(user_id, session_id, text, d, tracer=None, log=None) -> str:
                       extra_prompt=INVESTIGATE)
 
 
-def pending(user_id, session_id, text, d, tracer=None, log=None) -> str:
+def pending(user_id, session_id, text, d, tracer=None, log=None, **extra) -> str:
     """The user is answering our question ("which box?"): the agent has the options, no routing."""
-    return agent_chat(user_id, session_id, text, tracer=tracer, log=log)
+    return agent_chat(user_id, session_id, text, tracer=tracer, log=log, **extra)
 
 
 HANDLERS = {"smalltalk": smalltalk, "clarify": clarify, "simple_read": simple_read, "investigation": investigation,

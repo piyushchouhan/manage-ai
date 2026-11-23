@@ -61,7 +61,7 @@ def load_messages(session_id: int) -> list[dict]:
         rows = db.scalars(
             select(ChatMessage).where(ChatMessage.session_id == session_id).order_by(ChatMessage.id)
         )
-        return [{"id": m.id, "role": m.role, "content": m.content} for m in rows]
+        return [{"id": m.id, "role": m.role, "content": m.content, "display": m.display} for m in rows]  # display: 9.2
 
 
 def save_turn(session_id: int, question: str, reply: str):

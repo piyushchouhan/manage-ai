@@ -76,15 +76,18 @@ class StreamTracer(Tracer):
     def on_token(self, text: str):  # l12's generate() streams when this exists
         self.emit("token", {"text": text})
 
+    def on_display(self, display):  # 9.2: tables, metrics, follow-ups for the reply
+        self.emit("display", display.model_dump(mode="json"))
+
     def model_call(self, step, response, seconds):
         super().model_call(step, response, seconds)
         if response.function_calls:  # the model decided to use tools: they run next
             self.emit("tool", {"names": [c.name for c in response.function_calls]})
 
 
-def stream_turn(user_id: int, session_id: int, text: str, jobs) -> Iterator[str]:
+def stream_turn(user_id: int, session_id: int, text: str, jobs, handlers: dict | None = None) -> Iterator[str]:
     """The agent runs in a thread and puts events on a queue; this generator writes them out as they come.
-    jobs: where investigations go (8.2's ArqQueue)."""
+    jobs: where investigations go (8.2's ArqQueue). handlers: 9.2's, with tables."""
     events: queue.Queue = queue.Queue()
 
     def emit(kind: str, data: dict):
@@ -92,7 +95,8 @@ def stream_turn(user_id: int, session_id: int, text: str, jobs) -> Iterator[str]
 
     def work():
         try:
-            out = start_turn(user_id, session_id, text, jobs, tracer=StreamTracer(text, emit))
+            out = start_turn(user_id, session_id, text, jobs, tracer=StreamTracer(text, emit),
+                             **({"handlers": handlers} if handlers else {}))
             if out.get("job_id"):
                 emit("job", {"job_id": out["job_id"]})
             else:

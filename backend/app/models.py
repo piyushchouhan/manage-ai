@@ -206,6 +206,7 @@ class ChatMessage(Base):
     session_id: Mapped[int] = mapped_column(ForeignKey("chat_sessions.id"), index=True)
     role: Mapped[str] = mapped_column(String(20))
     content: Mapped[str] = mapped_column(Text)
+    display: Mapped[dict | None] = mapped_column(JSON)  # 9.2: {blocks, follow_ups} shown under a reply
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
 
 

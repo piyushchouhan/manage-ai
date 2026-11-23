@@ -143,19 +143,20 @@ RULES = {
 }
 
 
-def check(a: AnswerV9, log: list, c: Context) -> list[str]:
-    return [f"{name}: {p}" for name, rule in RULES.items() for p in rule(a, log, c)]
+def check(a: AnswerV9, log: list, c: Context, rules: dict = RULES) -> list[str]:
+    return [f"{name}: {p}" for name, rule in rules.items() for p in rule(a, log, c)]
 
 
 # --- The retry loop --------------------------------------------------------------------------------
 
-def setup(question: str, user_id: int, broken: dict | None = None):
-    """-> (tools the agent uses, its config, the rules' context). broken: tools replaced for a test."""
+def setup(question: str, user_id: int, broken: dict | None = None, config=CONFIG_V9):
+    """-> (tools the agent uses, its config, the rules' context). broken: tools replaced for a test.
+    config: 9.1 passes a bigger final_answer (with blocks)."""
     user = load_user(user_id)
     scope = scope_for(user)
     clean = {n: scope(fn) for n, fn in TOOLS_V7.items()}
     tools = {**clean, **{n: scope(fn) for n, fn in (broken or {}).items()}}
-    config = CONFIG_V9.model_copy(update={"system_instruction": CONFIG_V9.system_instruction + who(user)})
+    config = config.model_copy(update={"system_instruction": config.system_instruction + who(user)})
     return tools, config, Context(question, user, clean)
 
 
@@ -176,26 +177,36 @@ def safe_failure(a: AnswerV9 | None, log: list, c: Context) -> str:
 
 
 def answer(question: str, user_id: int, broken: dict | None = None, retries: int = 1) -> str:
-    tools, config, c = setup(question, user_id, broken)
+    """-> what the user sees: the summary if every rule passed, else the safe failure."""
+    a, log, c, ok = answer_checked(question, user_id, broken, retries)
+    return a.summary if ok and a else safe_failure(a, log, c)
+
+
+def answer_checked(question: str, user_id: int, broken: dict | None = None, retries: int = 1,
+                   schema: type[AnswerV9] = AnswerV9, config=CONFIG_V9,
+                   rules: dict = RULES) -> tuple[AnswerV9 | None, list, Context, bool]:
+    """The retry loop. -> (the last answer, its tool log, the context, passed?).
+    schema / config / rules: 9.1 asks for a bigger answer (with blocks) and adds a rule for it."""
+    tools, config, c = setup(question, user_id, broken, config)
     prompt, best, best_log = question, None, []
     for attempt in range(1, retries + 2):
         try:
-            a, log = ask(prompt, tools, config, AnswerV9)
+            a, log = ask(prompt, tools, config, schema)
         except TooManySteps:  # no answer at all is a failed attempt too, not a crash
             print(f"\n   attempt {attempt}: ran out of steps, no answer")
             prompt = f"{question}\n\nYour previous try ran out of steps. Answer with what you can verify, or say you can't."
             continue
         best, best_log = a, log
-        problems = check(a, log, c)
+        problems = check(a, log, c, rules)
         print(f"\n   attempt {attempt}: {a.summary}")
         for p in problems:
             print(f"     XX {p}")
         if not problems:
             print("     all rules pass")
-            return a.summary
+            return a, log, c, True
         prompt = retry_prompt(question, a, problems)
     print("   -> out of retries: safe failure")
-    return safe_failure(best, best_log, c)
+    return best, best_log, c, False
 
 
 # --- Experiments --------------------------------------------------------------------------------------

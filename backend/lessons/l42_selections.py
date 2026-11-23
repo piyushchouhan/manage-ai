@@ -89,13 +89,18 @@ def save_state(session_id: int, state: dict):
         db.commit()
 
 
+def as_selection(rows: list[dict]) -> list[dict]:
+    """What the user can point at later: sku, name, warehouse. 9.1's selection blocks use it too."""
+    return [{k: r[k] for k in ("sku", "name", "warehouse") if k in r} for r in rows]
+
+
 def last_list(log: list) -> list[dict] | None:
     """The last list of products any tool returned this turn (low stock items, search options)."""
     for _name, _args, result in reversed(log):
         for key in ("items", "options"):
             rows = result.get(key) if isinstance(result, dict) else None
             if rows and "sku" in rows[0]:
-                return [{k: r[k] for k in ("sku", "name", "warehouse") if k in r} for r in rows]
+                return as_selection(rows)
     return None
 
 

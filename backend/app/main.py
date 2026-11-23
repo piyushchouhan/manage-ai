@@ -11,9 +11,10 @@ X-User-Id: <id>  (a stand-in for a real login; see below).
                                    -> {"session_id", "path", "job_id": int}             investigations (8.1)
     GET  /api/jobs/{id}               -> {"id", "question", "status": queued|running|done|failed,
                                           "progress": "step 2/3: ...", "reply", "seconds"}
-    GET  /api/sessions/{id}/messages -> [{"role": "user"|"assistant", "content": "..."}, ...]
+    GET  /api/sessions/{id}/messages -> [{"role": "user"|"assistant", "content": "...",
+                                           "display": {"blocks", "follow_ups"} | null}, ...]   (display: 9.2)
   Streaming (8.3, Server-Sent Events; what the UI uses):
-    POST /api/chat/stream             same body -> events: session, tool, token..., then done or job
+    POST /api/chat/stream             same body -> events: session, tool, token..., display, then done or job
     GET  /api/jobs/{id}/events        -> events: progress (on every change, until done/failed)
 
 The agent is the latest lesson's: 1.2's loop + 3.3's tools, then module 4:
@@ -37,9 +38,10 @@ from app.db import query
 from lessons.l14_tracing import Tracer
 from lessons.l41_history import new_session
 from lessons.l47_isolation import NotYourSession, messages_for, owner_of
-from lessons.l81_jobs import ensure_tables, get_job, start_turn
+from lessons.l81_jobs import get_job, start_turn
 from lessons.l82_queue import ArqQueue
 from lessons.l83_streaming import job_events, stream_turn
+from lessons.l92_rendering import HANDLERS_V3, ensure_tables
 
 ensure_tables()  # no fail_stale() any more (8.1): running jobs belong to the worker, not to this process
 queue = ArqQueue()
@@ -72,7 +74,7 @@ def chat(req: ChatRequest, x_user_id: int = Header(1)) -> ChatReply:
     # Plain `def` (not async): FastAPI runs it in a thread, so a slow model call
     # doesn't block other requests.
     sid = session_for(x_user_id, req.session_id)
-    out = start_turn(x_user_id, sid, req.message, queue, tracer=Tracer(req.message))  # traces: backend/traces/
+    out = start_turn(x_user_id, sid, req.message, queue, tracer=Tracer(req.message), handlers=HANDLERS_V3)  # traces: backend/traces/
     return ChatReply(session_id=sid, **out)
 
 
@@ -88,7 +90,7 @@ SSE_HEADERS = {"Cache-Control": "no-cache", "X-Accel-Buffering": "no"}  # don't 
 @app.post("/api/chat/stream")
 def chat_stream(req: ChatRequest, x_user_id: int = Header(1)) -> StreamingResponse:
     sid = session_for(x_user_id, req.session_id)
-    return StreamingResponse(stream_turn(x_user_id, sid, req.message, queue),
+    return StreamingResponse(stream_turn(x_user_id, sid, req.message, queue, HANDLERS_V3),
                              media_type="text/event-stream", headers=SSE_HEADERS)
 
 
